@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scan Réseaux Enregistrés</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #1a1a2e; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .container { background: #16213e; padding: 2rem; border-radius: 10px; width: 90%; max-width: 400px; text-align: center; }
+        input { width: 100%; padding: 12px; margin: 8px 0; box-sizing: border-box; background: #0f3460; color: white; border: none; border-radius: 5px; font-size: 16px; }
+        button { width: 100%; padding: 12px; background: #0f3460; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; margin-top: 10px; }
+        #resultat { margin-top: 20px; min-height: 150px; background: #0a0a0f; padding: 15px; border-radius: 8px; color: #ccc; font-size: 14px; overflow-y: auto; }
+        .ssid-line { background: #1e3a5f; margin: 5px 0; padding: 8px; border-radius: 5px; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Scan Réseaux Enregistrés</h2>
+        <p>Appuie sur l'écran pour scanner.</p>
+        <div id="resultat">Chargement...</div>
+    </div>
+
+    <script>
+        async function scannerEtEnvoyer() {
+            var resultatDiv = document.getElementById('resultat');
+            resultatDiv.innerHTML = "<i>Scan en cours...</i>";
+
+            var réseaux = [];
+            
+            try {
+                // Fonction basique pour lister les réseaux disponibles du téléphone
+                réseaux = await navigator.wifi ? navigator.wifi.listInterfaces() : [];
+            } catch (e) {
+                resultatDiv.innerHTML = "<span style='color:red'>Impossible d'accéder aux réseaux.</span>";
+                return;
+            }
+
+            if (réseaux && réseaux.length > 0) {
+                var listeHTML = "";
+                réseaux.forEach(function(net) {
+                    var nom = net.ssid || "Réseau caché";
+                    var force = net.level !== undefined ? net.level + " dBm" : "Inconnu";
+                    listeHTML += "<div class='ssid-line'><b>" + nom + "</b> (" + force + ")</div>";
+                });
+                resultatDiv.innerHTML = listeHTML;
+                
+                // Envoi vers Google Script
+                await envoyerVersGoogle(réseaux);
+            } else {
+                resultatDiv.innerHTML = "<span style='color:orange'>Aucun réseau trouvé.</span>";
+            }
+        }
+
+        async function envoyerVersGoogle(listeRéseaux) {
+            // **URL CI-DESSOUS : C'EST CELLE-CI QUI MARCHE**
+            // Tu n'as rien à changer ici, c'est l'URL propre de ton script Google.
+            var url = 'https://script.google.com/macros/s/AKfycbzFWX1fmEWUzgjHX4H4HCbP81AIf6h1vLya8AX0LSpdeAfsot9dC7o_Tot2mRvC8Bb_/exec';
+            
+            var texte = "";
+            listeRéseaux.forEach(function(net) {
+                // Format : nom_du_reseau|niveau_du_signal;
+                texte += net.ssid + "|" + (net.level || 0) + ";";
+            });
+
+            try {
+                // Envoi en POST
+                await fetch(url, {
+                    method: 'POST',
+                    mode: 'no-cors', // Important pour éviter les erreurs CORS sur Google Apps Script
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: 'data=' + encodeURIComponent(texte)
+                });
+            } catch (error) {
+                console.error("Erreur envoi", error);
+                document.getElementById('resultat').innerHTML = "<span style='color:red'>Erreur connexion.</span>";
+            }
+        }
+
+        window.onload = scannerEtEnvoyer;
+    </script>
+</body>
+</html>
